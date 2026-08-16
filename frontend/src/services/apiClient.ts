@@ -14,7 +14,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers: {
-      "Content-Type": "application/json",
+      // Content-Type: application/json UNIQUEMENT s'il y a réellement un
+      // corps envoyé. Fastify (comme la plupart des frameworks stricts)
+      // refuse avec un 400 "Body cannot be empty when content-type is set
+      // to 'application/json'" si ce header est présent sans corps — ce qui
+      // cassait tous nos appels POST/PATCH sans payload (ex: POST
+      // /api/sessions, PATCH /api/sessions/:id/complete).
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers ?? {})
     }
