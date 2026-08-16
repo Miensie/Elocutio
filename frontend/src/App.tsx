@@ -7,6 +7,8 @@ import OnboardingPage from "@/features/onboarding/OnboardingPage";
 import DashboardPage from "@/features/dashboard/DashboardPage";
 import ExerciseLibraryPage from "@/features/exercises/ExerciseLibraryPage";
 import TrainingSessionPage from "@/features/training/TrainingSessionPage";
+import ProgressPage from "@/features/progress/ProgressPage";
+import ProfilePage from "@/features/profile/ProfilePage";
 
 export default function App() {
   const init = useAuthStore((s) => s.init);
@@ -44,7 +46,22 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-      {/* /progress et /profile seront ajoutées à une prochaine étape */}
+      <Route
+        path="/progress"
+        element={
+          <ProtectedRoute>
+            <ProgressPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute>
+            <ProfilePage />
+          </ProtectedRoute>
+        }
+      />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );

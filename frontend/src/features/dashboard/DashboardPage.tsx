@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { Toast } from "@/components/ui/Toast";
 import { useDashboard } from "@/hooks/useDashboard";
 import { useProfile } from "@/hooks/useProfile";
 import { useCreateDailySession } from "@/hooks/useSession";
@@ -11,10 +13,24 @@ export default function DashboardPage() {
   const { data: profile } = useProfile();
   const createSession = useCreateDailySession();
   const navigate = useNavigate();
+  const [error, setError] = useState<string | null>(null);
 
   async function handleStartSession() {
-    const session = await createSession.mutateAsync();
-    navigate(`/training/${session.id}`);
+    setError(null);
+    try {
+      const session = await createSession.mutateAsync();
+      navigate(`/training/${session.id}`);
+    } catch (err) {
+      // Sans ce catch, un échec réseau (backend Render endormi au premier
+      // appel, mauvaise VITE_API_BASE_URL, CORS...) échouait silencieusement :
+      // le bouton semblait "ne rien faire" sans aucun indice pour comprendre
+      // pourquoi. On affiche maintenant l'erreur réelle.
+      setError(
+        err instanceof Error
+          ? `Impossible de démarrer la séance : ${err.message}`
+          : "Impossible de démarrer la séance. Réessayez dans quelques secondes."
+      );
+    }
   }
 
   const settings = Array.isArray(profile?.user_settings) ? profile?.user_settings[0] : profile?.user_settings;
@@ -73,6 +89,7 @@ export default function DashboardPage() {
           )}
         </Card>
       </div>
+      {error && <Toast message={error} variant="error" onClose={() => setError(null)} />}
     </AppShell>
   );
 }

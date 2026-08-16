@@ -9,6 +9,14 @@ import { Card } from "@/components/ui/Card";
  * (pas via notre backend) : c'est le modèle recommandé par Supabase.
  * Le backend se contente ensuite de vérifier le JWT sur chaque requête.
  */
+
+// URL de retour après confirmation d'email / réinitialisation de mot de
+// passe. Construite dynamiquement (origin + base path courant) plutôt que
+// codée en dur : fonctionne identiquement en local (http://localhost:5173/)
+// et en prod sous GitHub Pages (https://user.github.io/elocutio/), sans
+// dépendre uniquement du réglage "Site URL" du dashboard Supabase.
+const AUTH_REDIRECT_URL = `${window.location.origin}${import.meta.env.BASE_URL}`;
+
 export default function LoginPage() {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
@@ -30,7 +38,11 @@ export default function LoginPage() {
         if (error) throw error;
         navigate("/dashboard");
       } else {
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: AUTH_REDIRECT_URL }
+        });
         if (error) throw error;
         setInfo("Compte créé. Vérifiez votre boîte mail si une confirmation est requise, puis connectez-vous.");
         setMode("login");
@@ -47,7 +59,9 @@ export default function LoginPage() {
       setError("Renseignez votre email d'abord, puis cliquez sur « mot de passe oublié »");
       return;
     }
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: AUTH_REDIRECT_URL
+    });
     if (error) setError(error.message);
     else setInfo("Email de réinitialisation envoyé si ce compte existe.");
   }

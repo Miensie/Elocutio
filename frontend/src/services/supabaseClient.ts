@@ -13,4 +13,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    // PKCE plutôt que le flow "implicit" par défaut : les tokens transitent
+    // par un paramètre de requête (?code=...) et non par le fragment "#".
+    // Important car le frontend utilise HashRouter (URLs en /#/route) pour
+    // fonctionner sous GitHub Pages et Capacitor — le flow implicit mettrait
+    // le token d'auth dans le même "#" que les routes et casserait les deux.
+    flowType: "pkce"
+  }
+});
