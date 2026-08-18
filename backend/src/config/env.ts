@@ -13,6 +13,12 @@ const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   AI_PROVIDER: z.enum(["gemini", "openai", "anthropic"]).default("gemini"),
   GEMINI_API_KEY: z.string().optional(),
+  // Modèle Gemini utilisé pour la transcription ET le feedback. Séparé en
+  // variable d'environnement plutôt que codé en dur : les noms de modèles
+  // Gemini évoluent fréquemment (ex. gemini-2.5-flash, gemini-3.x-flash...).
+  // Vérifiez le nom courant sur https://ai.google.dev/gemini-api/docs/models
+  // avant déploiement si la valeur par défaut ne fonctionne plus.
+  GEMINI_MODEL: z.string().default("gemini-2.5-flash"),
   // Liste d'origines autorisées séparées par des virgules, ex :
   // "http://localhost:5173,https://username.github.io"
   // (l'origine ne contient jamais de chemin — https://username.github.io

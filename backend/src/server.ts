@@ -8,6 +8,7 @@ import { exercisesRoutes } from "./routes/exercises.js";
 import { sessionsRoutes } from "./routes/sessions.js";
 import { dashboardRoutes } from "./routes/dashboard.js";
 import { progressRoutes } from "./routes/progress.js";
+import { speechRoutes } from "./routes/speech.js";
 
 const app = Fastify({ logger: true });
 
@@ -34,6 +35,7 @@ await app.register(exercisesRoutes);
 await app.register(sessionsRoutes);
 await app.register(dashboardRoutes);
 await app.register(progressRoutes);
+await app.register(speechRoutes);
 
 app
   .listen({ port: Number(env.PORT), host: "0.0.0.0" })

@@ -14,14 +14,19 @@ elocutio/
 └── capacitor/          (ajouté en phase 7 — build Android)
 ```
 
-## État actuel (Phase 2 — MVP en cours)
+## État actuel (Phase 4 terminée)
 
 - ✅ Schéma Supabase complet avec RLS (`supabase/migrations/0001_init.sql`)
 - ✅ Seed de 334 exercices issus du manuel (`supabase/seed/0002_seed_exercises.sql`)
-- ✅ Backend : auth middleware, routes `profile` (+ onboarding), `exercises`, `sessions` (génération de la séance du jour), `dashboard`
-- ✅ Frontend : Login/Signup, Onboarding (4 étapes), Dashboard, Bibliothèque d'exercices, Séance active avec suivi de progression
-- ✅ Navigation responsive (sidebar desktop / barre basse mobile), PWA installable
-- ⬜ Enregistrement audio, transcription, analyse IA, Coach IA (Phases 3-4)
+- ✅ Bucket Storage privé pour l'audio + RLS par dossier utilisateur (`supabase/migrations/0003_storage.sql`)
+- ✅ Backend : auth middleware, routes `profile`, `exercises`, `sessions`, `dashboard`, `progress`, `speech` (upload, analyse, feedback)
+- ✅ Frontend : Login/Signup, Onboarding, Dashboard, Bibliothèque, Séance active, Progrès, Profil
+- ✅ Enregistrement audio (`AudioRecorder`) — facultatif, additif à l'auto-évaluation
+- ✅ Musique d'ambiance générée par synthèse (Tone.js), coupée automatiquement pendant l'enregistrement
+- ✅ **Pipeline IA complet** : transcription (Gemini, audio → texte) → mesures objectives (débit, hésitations, calcul déterministe) → feedback IA structuré (scores, points forts/faibles, conseil) — architecture en couches (`AIService` / `SpeechRecognitionService`) jamais couplée directement à Gemini, remplaçable par un autre fournisseur sans toucher aux routes
+- ✅ Mise en cache : une tentative déjà analysée n'est jamais réanalysée (coût IA maîtrisé), analyse déclenchée uniquement sur action explicite de l'utilisateur
+- ✅ Navigation responsive, PWA installable avec icônes réelles
+- ⬜ Coach IA conversationnel, plan d'entraînement adaptatif (Phase 5)
 - ⬜ Gamification (badges, XP), Capacitor/Android (Phases 6-7)
 
 ## Déploiement
@@ -32,6 +37,7 @@ elocutio/
 2. Dans **SQL Editor**, exécuter dans l'ordre :
    - `supabase/migrations/0001_init.sql` (schéma + RLS)
    - `supabase/seed/0002_seed_exercises.sql` (334 exercices issus du manuel)
+   - `supabase/migrations/0003_storage.sql` (bucket audio privé + RLS)
 3. Récupérer dans **Project Settings > API** : `Project URL`, `anon public key`, `service_role key`
 
 > Le seed est généré par `supabase/seed/generate_seed.py`, qui lit `supabase/seed/manual_content/`. Pour régénérer : `cd supabase/seed && python3 generate_seed.py`.
@@ -89,4 +95,12 @@ npm run preview        # sert le build de prod sur http://localhost:4173
 
 ## Prochaine étape
 
-Phase 3 : enregistrement audio (composant `AudioRecorder`, upload vers Supabase Storage), puis Phase 4 : transcription et premier retour IA via Gemini.
+Phase 5 : personnalisation — le Coach IA utilise l'historique des `ai_feedback` et `objective_metrics` pour générer un plan d'entraînement adaptatif (au lieu de la sélection aléatoire actuelle par catégorie), et identifie automatiquement les priorités de progression de l'utilisateur.
+
+## Notes techniques Phase 4 (IA)
+
+- **SDK** : `@google/genai` (le SDK actuel de Google, pas l'ancien `@google/generative-ai` déprécié). Modèle configurable via `GEMINI_MODEL` (défaut `gemini-2.5-flash`) — vérifiez le nom courant sur [ai.google.dev/gemini-api/docs/models](https://ai.google.dev/gemini-api/docs/models) si besoin, les noms de modèles Gemini changent fréquemment.
+- **Format audio** : le pipeline envoie `audio/webm` (format par défaut de `MediaRecorder` sur Chrome/Firefox/Android) directement à Gemini, sans transcodage. Si vous rencontrez une erreur de format en production, transcoder côté serveur (ex. ffmpeg vers `audio/ogg`) est la solution de repli.
+- **Coût** : l'analyse (transcription + feedback, 2 appels Gemini) n'est déclenchée que sur clic explicite "Analyser", jamais automatiquement. Les résultats sont mis en cache en base : ré-visiter une tentative déjà analysée ne réappelle jamais l'IA.
+- **Honnêteté des mesures** : `objective_metrics` (débit, hésitations) est un calcul déterministe sur la transcription, distinct de `ai_feedback` (scores/conseils, jugement du modèle) — jamais mélangés, ni en base ni dans l'UI. La détection de pauses (silences) n'est pas implémentée : nécessiterait une analyse du signal audio, pas seulement du texte.
+

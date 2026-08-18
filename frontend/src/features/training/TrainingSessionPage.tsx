@@ -3,13 +3,15 @@ import { useNavigate, useParams } from "react-router-dom";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { AudioRecorder } from "@/components/AudioRecorder";
 import { useSession, useCompleteSessionExercise, useCompleteSession } from "@/hooks/useSession";
 
 /**
- * MVP volontairement SANS audio/IA à ce stade (phases 3 et 4 du projet) :
- * l'utilisateur lit la consigne, s'entraîne à voix haute par lui-même,
- * puis s'auto-évalue de 1 à 10. C'est une mesure déclarative, pas une
- * mesure objective — on ne prétend analyser ni le débit ni la voix ici.
+ * L'enregistrement audio (Module AudioRecorder) est FACULTATIF et additif :
+ * l'utilisateur peut toujours valider un exercice sans jamais enregistrer sa
+ * voix, en ne renseignant que l'auto-évaluation. L'analyse IA de ces
+ * enregistrements (transcription, feedback) arrive en Phase 4 — pour
+ * l'instant l'audio est stocké et réécoutable, mais pas encore analysé.
  */
 export default function TrainingSessionPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -87,6 +89,8 @@ export default function TrainingSessionPage() {
               </div>
 
               <ExerciseContent instructions={current.exercises.instructions} content={current.exercises.content} />
+
+              <AudioRecorder exerciseId={current.exercise_id} sessionId={sessionId} />
 
               <div>
                 <p className="text-xs text-brand-900/60 mb-2">Comment évaluez-vous votre réalisation ?</p>
