@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { supabaseForUser } from "../database/supabaseAdmin.js";
+import { computeCategoryRatings, suggestedDifficulty } from "../coach/categoryWeakness.js";
 
 // Ordre pédagogique repris du manuel : respiration -> échauffement ->
 // articulation -> virelangues -> lecture -> improvisation.
@@ -19,8 +20,12 @@ const completeExerciseSchema = z.object({
 });
 
 export async function sessionsRoutes(app: FastifyInstance) {
-  // POST /api/sessions — crée une séance "quotidienne" en piochant un
-  // exercice par catégorie (dans l'esprit de la routine 20-25 min du manuel).
+  // POST /api/sessions — crée une séance adaptative : un exercice par
+  // catégorie comme base (esprit de la routine du manuel), plus un exercice
+  // supplémentaire dans la catégorie la plus faible de l'utilisateur
+  // (déterminée à partir de ses auto-évaluations passées). La difficulté
+  // ciblée dans chaque catégorie s'ajuste aussi à la moyenne obtenue.
+  // Entièrement déterministe, sans appel IA (voir coach/categoryWeakness.ts).
   app.post("/api/sessions", { preHandler: requireAuth }, async (request, reply) => {
     const client = supabaseForUser(request.accessToken!);
 
@@ -35,7 +40,22 @@ export async function sessionsRoutes(app: FastifyInstance) {
       return reply.code(500).send({ message: "Impossible de créer la séance" });
     }
 
+    let categoryRatings: Awaited<ReturnType<typeof computeCategoryRatings>> = [];
+    try {
+      categoryRatings = await computeCategoryRatings(client, request.userId!);
+    } catch (err) {
+      // Pas bloquant : sans données de notation, on retombe simplement sur
+      // une séance non biaisée (comportement de la version précédente).
+      request.log.error(err);
+    }
+
+    const ratingsByCode = new Map(categoryRatings.map((r) => [r.code, r]));
+    const weakest = categoryRatings
+      .filter((r) => r.count >= 1)
+      .sort((a, b) => a.averageRating - b.averageRating)[0];
+
     const chosenExercises: { id: string }[] = [];
+
     for (const categoryCode of DAILY_CATEGORY_ORDER) {
       const { data: category } = await client
         .from("exercise_categories")
@@ -44,19 +64,41 @@ export async function sessionsRoutes(app: FastifyInstance) {
         .single();
       if (!category) continue;
 
-      // On pioche un exercice au hasard dans la catégorie. Pour un vrai
-      // aléatoire côté SQL on utiliserait order("random()"), non supporté
-      // nativement par le client JS — on récupère un lot et on tire en JS.
-      const { data: candidates } = await client
+      const desiredCount = weakest && categoryCode === weakest.code ? 2 : 1;
+      const rating = ratingsByCode.get(categoryCode);
+      const targetDifficulty = rating && rating.count >= 2 ? suggestedDifficulty(rating.averageRating) : null;
+
+      // On tente d'abord avec la difficulté ciblée ; si ça ne renvoie pas
+      // assez d'exercices (catégorie peu fournie à ce niveau), on retombe
+      // sur l'ensemble de la catégorie plutôt que de laisser un trou dans
+      // la séance.
+      let candidatesQuery = client
         .from("exercises")
         .select("id")
         .eq("category_id", category.id)
         .eq("is_active", true)
         .limit(50);
+      if (targetDifficulty) candidatesQuery = candidatesQuery.eq("difficulty", targetDifficulty);
 
-      if (candidates && candidates.length > 0) {
-        const pick = candidates[Math.floor(Math.random() * candidates.length)];
-        chosenExercises.push(pick);
+      let { data: candidates } = await candidatesQuery;
+      if (!candidates || candidates.length < desiredCount) {
+        const fallback = await client
+          .from("exercises")
+          .select("id")
+          .eq("category_id", category.id)
+          .eq("is_active", true)
+          .limit(50);
+        candidates = fallback.data;
+      }
+
+      if (!candidates || candidates.length === 0) continue;
+
+      // Tirage sans remise dans les candidats disponibles pour cette catégorie
+      const pool = [...candidates];
+      for (let i = 0; i < desiredCount && pool.length > 0; i++) {
+        const index = Math.floor(Math.random() * pool.length);
+        chosenExercises.push(pool[index]);
+        pool.splice(index, 1);
       }
     }
 
@@ -80,7 +122,11 @@ export async function sessionsRoutes(app: FastifyInstance) {
       return reply.code(500).send({ message: "Impossible d'associer les exercices à la séance" });
     }
 
-    return { ...session, session_exercises: sessionExercises };
+    return {
+      ...session,
+      session_exercises: sessionExercises,
+      adapted_for_category: weakest?.code ?? null
+    };
   });
 
   // GET /api/sessions/:id — relit une séance avec ses exercices

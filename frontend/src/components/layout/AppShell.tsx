@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { to: "/dashboard", label: "Accueil", icon: "🏠" },
   { to: "/exercises", label: "Entraînement", icon: "🎙" },
   { to: "/progress", label: "Progrès", icon: "📈" },
+  { to: "/coach", label: "Coach IA", icon: "🧠" },
   { to: "/profile", label: "Profil", icon: "👤" }
 ];
 

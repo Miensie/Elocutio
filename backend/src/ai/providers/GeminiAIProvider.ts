@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { env } from "../../config/env.js";
-import type { AIService, FeedbackRequest, FeedbackResult } from "../AIService.js";
+import type { AIService, FeedbackRequest, FeedbackResult, CoachMessageRequest } from "../AIService.js";
 
 // Schéma de sortie structurée : Gemini renvoie du JSON garanti conforme à
 // cette forme (responseSchema), on évite ainsi le parsing fragile de texte
@@ -100,5 +100,34 @@ export class GeminiAIProvider implements AIService {
       advice: parsed.advice ?? "",
       modelUsed: this.model
     };
+  }
+
+  async generateCoachMessage(input: CoachMessageRequest): Promise<string> {
+    const skillsText = input.skills
+      .map((s) => `- ${s.label} : ${s.score}/100${s.trend != null ? ` (${s.trend >= 0 ? "+" : ""}${s.trend} vs semaine précédente)` : ""}`)
+      .join("\n");
+
+    const prompt = `Tu es un coach vocal francophone bienveillant. Rédige un message court (3-4 phrases
+maximum) pour ${input.displayName ?? "cet utilisateur"}, qui suit un programme d'entraînement à
+l'expression orale${input.objective ? ` avec pour objectif : ${input.objective}` : ""}.
+
+Voici son profil vocal actuel, mesuré à partir de ses enregistrements analysés :
+${skillsText}
+
+Points forts identifiés : ${input.strengths.join(", ") || "aucun assez marqué pour l'instant"}
+Points à travailler : ${input.weaknesses.join(", ") || "aucun assez marqué pour l'instant"}
+
+Consignes :
+- Base-toi UNIQUEMENT sur les chiffres fournis ci-dessus, n'invente aucune donnée.
+- Mentionne un progrès concret si une tendance positive existe dans les données.
+- Termine par une suggestion concrète et brève pour la prochaine séance.
+- Ton chaleureux mais direct, jamais mièvre. Pas d'emoji. 3-4 phrases maximum.`;
+
+    const response = await this.client.models.generateContent({
+      model: this.model,
+      contents: prompt
+    });
+
+    return (response.text ?? "").trim();
   }
 }

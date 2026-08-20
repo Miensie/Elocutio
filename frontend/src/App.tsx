@@ -9,6 +9,7 @@ import ExerciseLibraryPage from "@/features/exercises/ExerciseLibraryPage";
 import TrainingSessionPage from "@/features/training/TrainingSessionPage";
 import ProgressPage from "@/features/progress/ProgressPage";
 import ProfilePage from "@/features/profile/ProfilePage";
+import CoachPage from "@/features/coach/CoachPage";
 
 export default function App() {
   const init = useAuthStore((s) => s.init);
@@ -59,6 +60,14 @@ export default function App() {
         element={
           <ProtectedRoute>
             <ProfilePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/coach"
+        element={
+          <ProtectedRoute>
+            <CoachPage />
           </ProtectedRoute>
         }
       />

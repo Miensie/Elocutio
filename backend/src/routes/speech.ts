@@ -290,6 +290,23 @@ export async function speechRoutes(app: FastifyInstance) {
         return reply.code(500).send({ message: "Impossible d'enregistrer le feedback IA" });
       }
 
+      // Alimente la série temporelle utilisée par le Coach IA (voir
+      // coach/voiceProfile.ts) : un point par compétence évaluée, horodaté
+      // à maintenant. Ce n'est PAS un appel IA supplémentaire — juste
+      // l'enregistrement du résultat déjà obtenu ci-dessus, sous une forme
+      // exploitable pour calculer des tendances dans le temps. Un échec ici
+      // n'invalide pas l'analyse déjà réussie : on log sans faire échouer
+      // toute la requête.
+      const progressRows = Object.entries(feedback.scores).map(([skill, score]) => ({
+        user_id: request.userId,
+        skill,
+        score
+      }));
+      if (progressRows.length > 0) {
+        const { error: progressError } = await client.from("progress").insert(progressRows);
+        if (progressError) request.log.error(progressError);
+      }
+
       return {
         transcription: { text: transcriptText, words_count: wordsCount },
         objective_metrics: insertedMetrics,

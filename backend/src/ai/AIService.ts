@@ -26,4 +26,19 @@ export interface FeedbackResult {
 
 export interface AIService {
   generateFeedback(input: FeedbackRequest): Promise<FeedbackResult>;
+  /**
+   * Génère un court message de coaching en langage naturel à partir du
+   * profil vocal déjà calculé (voir coach/voiceProfile.ts). Ne fait AUCUN
+   * calcul de score lui-même — uniquement de la formulation motivante à
+   * partir de chiffres déjà établis, pour rester factuel plutôt qu'inventif.
+   */
+  generateCoachMessage(input: CoachMessageRequest): Promise<string>;
+}
+
+export interface CoachMessageRequest {
+  displayName: string | null;
+  objective: string | null;
+  skills: { label: string; score: number; trend: number | null }[];
+  strengths: string[];
+  weaknesses: string[];
 }
